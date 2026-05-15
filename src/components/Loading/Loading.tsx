@@ -81,7 +81,6 @@ const SVG_CONTENT = `<svg viewBox="0 0 446 540" xmlns="http://www.w3.org/2000/sv
 
 export const Loading: React.FC<LoadingProps> = ({ className, style, active = true }) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const fadeCircleRef = useRef<HTMLDivElement>(null);
     const preContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -107,39 +106,39 @@ export const Loading: React.FC<LoadingProps> = ({ className, style, active = tru
     }, []);
 
     useEffect(() => {
-        if (!preContainerRef.current || !fadeCircleRef.current || !containerRef.current) return;
+        if (!preContainerRef.current || !containerRef.current) return;
 
-        const rect = preContainerRef.current.getBoundingClientRect();
-        const size = Math.max(rect.width, rect.height);
-        const scale = (size / 5) + 5;
-        const duration = Math.max(0.1, size / 1500);
+        const container = containerRef.current;
+        const rect = container.getBoundingClientRect();
+        // 终态半径需完全覆盖对角线（从中心到最远角），再加余量防止四角残留
+        const finalR = Math.ceil(Math.hypot(rect.width, rect.height) / 2) + 50;
+        const duration = Math.max(0.1, finalR / 1500);
 
         if (active) {
-            fadeCircleRef.current.style.opacity = '0';
-            fadeCircleRef.current.style.transform = 'scale(1)';
-            containerRef.current.style.display = 'flex';
+            container.classList.remove(styles.closing);
+            container.style.transition = '';
+            container.style.setProperty('--mask-r', '0px');
+            container.style.display = 'flex';
         } else {
-            fadeCircleRef.current.style.opacity = '1';
-            fadeCircleRef.current.style.transform = 'scale(1)';
-            requestAnimationFrame(() => {
-                if (fadeCircleRef.current && containerRef.current) {
-                    fadeCircleRef.current.style.transition = `transform ${duration}s linear`;
-                    fadeCircleRef.current.style.transform = `scale(${scale})`;
-                    setTimeout(() => {
-                        if (containerRef.current) {
-                            containerRef.current.style.display = 'none';
-                        }
-                    }, duration * 1000);
+            container.classList.add(styles.closing);
+            container.style.transition = '';
+            container.style.setProperty('--mask-r', '0px');
+            // 强制 reflow 让初始值生效
+            void container.offsetHeight;
+            container.style.transition = `--mask-r ${duration}s linear`;
+            container.style.setProperty('--mask-r', `${finalR}px`);
+            setTimeout(() => {
+                if (containerRef.current) {
+                    containerRef.current.style.display = 'none';
                 }
-            });
+            }, duration * 1000);
         }
     }, [active]);
 
     return (
-        <div ref={preContainerRef}>
+        <div ref={preContainerRef} className={styles.wrapper}>
             <div ref={containerRef} className={`${styles.container} ${className || ''}`} style={style}>
                 <div dangerouslySetInnerHTML={{ __html: SVG_CONTENT }} />
-                <div ref={fadeCircleRef} className={styles.fadeCircle} />
             </div>
         </div>
     );
